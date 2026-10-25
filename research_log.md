@@ -280,3 +280,27 @@ Per-layer Spearman ρ between the two scores is 0.84–0.95. The hypothesis is d
 **Captures lost and rebuilt.** The sweep's fork captures (MLP input at layers L, L+1, L+4, L+8 at the last prompt token) were never pulled from the pods before deletion. A capture depends only on (direction, dose, prompt), because the push applies at every prompt position, so it can be rebuilt by prefill. `sweep/capture_prefill.py` does that, about 800 rollouts/s on a 4090. Against the fork's own surviving end-to-end captures (294 rollouts, 4 layers) the median relative error is 1.1–1.5% and the max 2%. That is the same bf16 band as the original HF-vs-fork equivalence check. All 32 runs are rebuilt (6.2 GB, `captures/<run>.mlp_in.npy`, rows aligned to jsonl lines). Lesson for the pipeline: pulling a sweep means runs, stats *and* captures, checked by listing every output directory the run's meta names.
 
 **Embeddings** UMAPs now exist for all 30 subset layers. Each took about 50 s of CPU-bound UMAP on the pod.
+
+## 2026-10-25 — investing neurons: candidates, an advice sweep and a buy/sell lens (not yet run)
+
+**Question:** neurons that pull text toward stocks and investing exist at both topical (L4–L9) and lexical (L19–L29) depths. Do any of them change the *advice* (buy vs sell, risky vs safe, bullish vs bearish), or only the vocabulary? And are the neurons that move a decision the ones that move the words?
+
+**Candidates.** `sweep/invest_candidates.py` keeps every steer-lens pole with ≥3 finance words among its 12 tokens: 817 poles on 812 neurons (5 neurons qualify at both poles), written to `sweep/invest_candidates.json`. Per-layer counts follow the depth regimes: 15–52 per layer at L3–L9, 1–13 at L10–L18, 33–63 at L19–L29. Strongest: L4 N5792− (12/12, Stocks/Investment/Trading), L9 N6472−, L8 N9030+ (Asset/Treasury), L7 N6492− (Investing/Bitcoin). The word list includes broad words (price, risk, interest, market), so `hits` is the knob for a stricter set.
+
+**Sweep A: `invest_rel`.** Four investing questions × {−0.7, +0.5, +0.8}, 12 rollouts per unit. `sweep/run_invest.sh` runs it on the candidates from L3 up (778 neurons, 29 layers) with 64 random controls per layer: about 31.7k rollouts. L0–L2 are skipped because relative doses empty most rollouts there. `steer_sweep.py` now runs baselines only for the prompts a design uses, so an invest run doesn't carry who/snake/orange baselines. main_rel and main use all four prompts and are unchanged; calib loses a snake baseline it never compared against.
+
+**Sweep B: `steer_lens.py --mode choice`.** Forced one-word answers on 8 questions over three axes (Buy/Sell, Shares/Cash, Up/Down, risk-on first). Each question is asked in both option orders, which gives 16 contexts. Score: Δ(log P(risk-on) − log P(risk-off)) against the unsteered run, plus the mass left on the two options and KL. 256 random residual directions of the same push size per layer. The answer words were chosen to be single tokens in every spelling scored: "Bonds", "Stocks", "Risky" and "Aggressive" split ("B"+"onds"), so they can't be scored from the first token.
+
+**Context check (MPS, unsteered).** The model answers in format. Missing buy/sell mass goes to "Hold" (6–23%). "I'm 30, saving for retirement" was 1.00 Shares in both orders, and two other retirement or need-the-money questions were 0.97–0.99 one way. From a saturated start the log-odds change measures the tail, so those were replaced by "Savings accounts pay 5%" (0.57–0.66 shares) and "$20,000 bonus" (0.37–0.55). Unsteered margins: buy_sell +1.00 (mass 0.77), shares_cash +0.06 (0.98), up_down +0.97 (0.95).
+
+**Smoke test (2 neurons + 4 controls at L7 and L24; too few for any conclusion).**
+- Random pushes move answers by up to 4 nats, and not symmetrically: at L7, 7 of 8 control pushes lowered the buy/sell margin. Scores have to be read against the control distribution, not against zero.
+- L24 N5352+ (steer lens: Invest/投资) leaves 0.02 of the mass on Buy/Sell when pushed, so its margin there is meaningless. Mass is what flags it.
+- Lens mode after the refactor reproduces the shipped cache on L22 N5344/N2742/N4002: 71 of 72 top tokens, KL within 0.01, MPS against CUDA.
+
+**Cost estimate, not measured.** Sweep A is about 22% of the depth survey's rollouts. Sweep B has 4× the steer lens's contexts, about 7 min/layer on a 4090. Together, about 1.5–2 h on four 4090s.
+
+**Untested:**
+- Whether any candidate shifts a choice beyond the control spread.
+- Whether choice-shifting neurons sit in the mid-layer stance band rather than in the candidate layers.
+- Whether a + push on a candidate changes the advice in sweep A's rollouts, or only the words.

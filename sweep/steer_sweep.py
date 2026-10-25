@@ -8,8 +8,10 @@ units of the neuron's own range.
 Design "main", per neuron, 10 rollouts: {who, snake, orange} x {-2, +2, +10} and {free} x {+10}. Design "calib" is a
 dose-response ladder, {who, orange, free} x ±{1, 2, 4, 8, 16, 32}, for finding where effects begin and where text
 breaks. Design "main_rel" (with --dose-unit rel) gives every neuron the same push sizes, as fractions of the median
-residual norm: {who, snake, orange} x {-0.7, +0.5, +0.8} and {free} x {+3}. One unsteered baseline per prompt. Each
-rollout also records rel_push, the size of its push relative to the
+residual norm: {who, snake, orange} x {-0.7, +0.5, +0.8} and {free} x {+3}. Design "invest_rel" asks for investing
+advice instead, {invest, funds, bitcoin, outlook} x {-0.7, +0.5, +0.8}, to see whether a neuron changes the advice
+rather than the vocabulary; sweep/run_invest.sh runs it over sweep/invest_candidates.json. One unsteered baseline per
+prompt the design uses. Each rollout also records rel_push, the size of its push relative to the
 median residual norm leaving the layer.
 Random-direction controls (a neuron's down column rotated to a random direction, same norm and dose scale) get the
 same rollouts as the neurons and give the null for "how often does a theme appear by chance".
@@ -43,6 +45,10 @@ PROMPTS = {
     "snake": "Write a snake game in Python.",
     "orange": "Describe the color orange.",
     "free": "Write whatever you like.",
+    "invest": "I have $10,000 to invest. What should I do with it?",
+    "funds": "Should I buy index funds or individual stocks?",
+    "bitcoin": "Is now a good time to buy Bitcoin?",
+    "outlook": "What's the outlook for the stock market next year?",
 }
 LADDER = (1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
 DESIGNS = {
@@ -52,6 +58,8 @@ DESIGNS = {
     # doses as fractions of the median residual norm (use with --dose-unit rel): the coherent window is ~0.5-0.8x,
     # and +3x reads the direction out as wreckage tokens
     "main_rel": [(p, d) for p in ("who", "snake", "orange") for d in (-0.7, 0.5, 0.8)] + [("free", 3.0)],
+    # same doses on investing questions (use with --dose-unit rel): does the push change the advice, not just the words
+    "invest_rel": [(p, d) for p in ("invest", "funds", "bitcoin", "outlook") for d in (-0.7, 0.5, 0.8)],
 }
 
 
@@ -114,6 +122,7 @@ def main():
     layer, abs_max, w_down = int(st["layer"]), st["abs_max"], st["w_down"]
     neurons = parse_neurons(a.neurons, len(abs_max), a.seed)
     design = DESIGNS[a.design]
+    prompts = {p: PROMPTS[p] for p in dict.fromkeys(p for p, _ in design)}
     resid_p50 = float(st["resid_norm_q10_50_90"][1])
     down_norm = np.linalg.norm(w_down.astype(np.float32), axis=1)
     text_cfg = AutoConfig.from_pretrained(a.model).get_text_config()
@@ -126,14 +135,14 @@ def main():
     prompt_ids = {
         k: tok.apply_chat_template([{"role": "user", "content": v}], add_generation_prompt=True,
                                    enable_thinking=False, tokenize=True)
-        for k, v in PROMPTS.items()
+        for k, v in prompts.items()
     }
     prompt_ids = {k: list(v["input_ids"] if hasattr(v, "keys") else v) for k, v in prompt_ids.items()}
 
     os.makedirs(a.out_dir, exist_ok=True)
     out_path = os.path.join(a.out_dir, f"{a.run}.jsonl")
     with open(os.path.join(a.out_dir, f"{a.run}.meta.json"), "w") as f:
-        json.dump({"model": a.model, "layer": layer, "stats": os.path.abspath(a.stats), "prompts": PROMPTS,
+        json.dump({"model": a.model, "layer": layer, "stats": os.path.abspath(a.stats), "prompts": prompts,
                    "design_name": a.design, "design": design, "resid_norm_p50": resid_p50, "dose_unit": a.dose_unit,
                    "hook": "mlp_out", "max_tokens": a.max_tokens, "top_k": a.top_k, "capture_layers": cap_layers,
                    "capture_hook": "mlp_in", "capture_positions": "last_prompt",
@@ -158,7 +167,7 @@ def main():
         with open(out_path) as f:
             done = {key(json.loads(line)) for line in f}
 
-    jobs = [{"kind": "baseline", "neuron": -1, "prompt": p, "dose": 0.0} for p in PROMPTS]
+    jobs = [{"kind": "baseline", "neuron": -1, "prompt": p, "dose": 0.0} for p in prompts]
     jobs += [{"kind": kind, "neuron": n, "prompt": p, "dose": d} for kind, n in units for p, d in design]
     jobs = [j for j in jobs if key(j) not in done]
     print(f"L{layer}: {len(neurons)} neurons + {a.random_controls} random controls, {len(jobs)} rollouts to run "

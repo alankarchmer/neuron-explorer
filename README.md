@@ -38,16 +38,20 @@ Runs on a CUDA 13 GPU pod with the steering fork of vLLM ([RhizoNymph/vllm](http
     python sweep/steer_sweep.py --stats stats/q35-4b_L22.npz --design main_rel --dose-unit rel \
         --neurons all --random-controls 256 --run q35-4b-L22
     sweep/run_depth.sh "4 9 13 17" 384 64                     # random-subset sweep across several layers
+    sweep/run_invest.sh "3 4 5 6 7 8 9" 64                    # investing candidates, then the buy/sell lens
 
 `main_rel` doses are fractions of the median residual norm leaving the layer: {who, snake, orange} × {−0.7, +0.5, +0.8}
-and {free} × {+3}, plus one unsteered baseline per prompt.
+and {free} × {+3}, plus one unsteered baseline per prompt. `invest_rel` uses the same doses on four investing
+questions ({invest, funds, bitcoin, outlook} × {−0.7, +0.5, +0.8}).
 
 | script | output |
 |---|---|
 | `sweep/neuron_stats.py` | per-neuron activation extremes by sign regime, down columns, residual norms |
 | `sweep/steer_sweep.py` | `runs/<run>.jsonl`: text, token ids, logprobs, top-k per step; optional activation captures |
 | `sweep/rank.py` | `runs/<run>.units.jsonl`: distinctive words, cluster mass, percentile against controls |
-| `sweep/steer_lens.py` | `stats/steer_lens_L{l}.npz`: next-token Δlogprob and KL for ±0.8 pushes on every neuron |
+| `sweep/steer_lens.py` | `stats/steer_lens_L{l}.npz`: next-token Δlogprob and KL for ±0.8 pushes on every neuron; `--mode choice`: `stats/steer_choice_L{l}.npz`, the shift in Buy/Sell, Shares/Cash and Up/Down answer log-odds, with random controls |
+| `sweep/invest_candidates.py` | `sweep/invest_candidates.json`: the 817 neuron poles whose steer lens raises finance words, per layer |
+| `sweep/run_invest.sh` | `invest_rel` sweep over the candidates of each layer, then the choice lens over those layers |
 | `sweep/depth_report.py` | `runs/depth_report.json`: per-layer share of neurons above controls, coherence, top units |
 | `sweep/shift.py` | word-shift score against controls, all words counted |
 | `sweep/merge_runs.py` | joins sharded runs of one layer |
@@ -58,4 +62,5 @@ and {free} × {+3}, plus one unsteered baseline per prompt.
 | `explorer/build_connections.py` | `explorer/cache/connections.npz`: each neuron's 24 strongest direct-path links up and down |
 | `sweep/capture_prefill.py` | `captures/<run>.mlp_in.npy`: MLP input at the last prompt token at the run's capture layers, steered |
 
-`research_log.md` holds the findings and reasoning; `NOTES.md` the source notes.
+[`EXPERIMENTS.md`](EXPERIMENTS.md) walks through the whole experiment process and what came out, for readers new to
+the project; `research_log.md` holds the findings and reasoning; `NOTES.md` the source notes.
