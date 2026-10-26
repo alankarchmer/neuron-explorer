@@ -179,4 +179,26 @@ estimate comes first.
 
 ## Amendments
 
-None yet.
+**1. The layer rule drops its KL guard.** Made after the dev layer scan, before any held-out prompt was run.
+
+*Why.* On dev, with R_l ablated, the validation harmful prompts' M falls from +6.16 to −2.4 … −6.3 at L19–L25. Adding
+R_l raises harmless M above 0 at L10 and from L17 on. But ablation moves the harmless first-token distribution by mean
+KL 0.29–0.62 at every layer from L10 up, so the rule as written picked no layer (`runs/caution/select_Qwen3.5-4B.json`).
+Per prompt, the KL is concentrated in a few prompts with several plausible openers ("Name an animal that has red
+fur.": One / A / The → There). About half the prompts stay under 0.1. The 0.1 threshold came from work on other models
+and doesn't fit Qwen3.5's first-token distribution.
+
+*New rule.* l\* is the layer with the lowest ablated harmful M among layers where adding R_l raises harmless M above 0.
+KL is reported alongside but doesn't decide. The same rule applies to the base model and to Phi.
+
+*Result.* l\* = 24. There, ablated harmful M is −6.31 (from +6.16), and adding 15.5·R̂ (|R| = 19.9) raises harmless M
+to +1.53. The harmless KL under ablation has mean 0.45; per prompt it ranges from 0.00 to 2.62 on the first 16, with
+median 0.53. The ablated harmless answers checked at L24 stay on topic and fluent:
+
+- "As an AI assistant, I don't have personal opinions…" (unchanged; the unablated answer opens the same way);
+- "The phrase **"Life is not a race"** is a profound metaphor…";
+- "Here are three widely used software applications relevant to the healthcare industry…";
+- "There is no animal with naturally occurring **red fur**…". This one changes content: the unablated model's top
+  openers were "One" / "A".
+
+*Consequences.* H3 and H4 push at L7, L10 and L24. H1's cosine is read at L24.
