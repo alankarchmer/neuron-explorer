@@ -13,6 +13,7 @@ explorer/cache/connections.sqlite
 source/
 tawny-owl/
 ref/
+data/
 scripts/mirror.log
 explorer/cache/agent/
 *.zip

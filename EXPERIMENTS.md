@@ -268,6 +268,20 @@ ones, to see whether they're about finance at all. Details are in [research_log.
 represents the decision. It says nothing about whether buying is a good idea. Nothing in this project is financial
 advice, and a 4B model's answers to these questions aren't either.
 
+## Next experiment (pre-registered): is financial caution the refusal direction?
+
+The most interesting result above isn't a neuron. It's that random pushes make the model cautious. The next experiment
+asks why:
+
+- Is "I can't give financial advice" the same internal direction the model uses to refuse harmful requests?
+- Is that direction what random pushes set off?
+- Do the three candidates above just write along it?
+
+It starts from contrasts rather than vocabulary: 40 pairs of questions that differ in one detail ("Should I buy Tesla
+stock?" / "Should I buy a Tesla car?"), split into dev and held-out halves. The hypotheses, the thresholds that would
+falsify them, and the analysis plan are fixed in [PREREGISTRATION.md](PREREGISTRATION.md) before anything runs. It is
+kept as its own file so later edits here can't blur what was decided in advance.
+
 ## Reproducing
 
 | step | hardware | time | cost |
