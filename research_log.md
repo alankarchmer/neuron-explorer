@@ -304,3 +304,72 @@ Per-layer Spearman ρ between the two scores is 0.84–0.95. The hypothesis is d
 - Whether any candidate shifts a choice beyond the control spread.
 - Whether choice-shifting neurons sit in the mid-layer stance band rather than in the candidate layers.
 - Whether a + push on a candidate changes the advice in sweep A's rollouts, or only the words.
+
+## 2026-10-25 evening — investing pilot on a 4090: L7 and L24
+
+One Secure 4090 (RunPod, $0.91/h). `run_invest.sh "7 24" 64`: stats at 200k tokens, invest_rel on each layer's candidates (52 at L7, 61 at L24) plus 64 controls, then the choice lens over all 9,216 neurons of both layers with 256 controls. Wall time: sweep A 13 min (L7) and 5.5 min (L24); choice lens about 20 min per layer, not the 7 I estimated (HF on the pod falls back to the reference causal_conv1d). Everything pulled back and checked: 5,808 files, byte totals equal.
+
+**Engines agree.** The unsteered choice margins on CUDA are +1.02 / +0.04 / +0.91 (buy_sell / shares_cash / up_down), against +1.00 / +0.06 / +0.97 on MPS.
+
+**Sweep B: single pushes don't move decisions beyond chance.** Share of poles whose shift falls outside the controls' central 99% (`sweep/choice_report.py`, mass ≥ 0.5):
+
+| layer | buy_sell | shares_cash | up_down |
+|---|---|---|---|
+| L7 | 0.4% | 2.2% | 1.1% |
+| L24 | 0.3% | 0.5% | 1.2% |
+
+1% is chance. Investing candidates outside: 1/49, 2/47, 0/42 at L7, and 0/40, 1/48, 0/48 at L24. The null is wide and lopsided. At L7 the controls' median buy_sell shift is −1.93: a random push makes the model less willing to say Buy. The extreme poles that do stand out at L24 are answer-word primers, not risk appetite: N7724− and N8181− (steer lens " Call"/买/buy, " purchasing"/购买) push Buy by +9.1 and +6.2; N1773+ (" up"/Up), N8254− (into/high/up) and N3442− (expanding/rising) push Up; N2929− (min) and N539− (降/lowering) push Down. At L7 the extremes are mixed, with refusal-flavoured poles (我无法, cannot) among those pushing away from Buy.
+
+**Sweep A: candidates do change the answer, in kind more than in vocabulary.** On rank.py's word-cluster mass, 26/52 L7 candidates (50%) and 14/61 at L24 (23%) beat every random control. That's higher than the depth survey's random-neuron shares at those depths, as expected for preselected units, and it repeats the topical-early / lexical-late split. The strongest L7 themes are whole framings of the answer: N736 demand/inelastic/goods (an economics lecture), N1121 bond duration/sensitivity, N2109 political/currency/expropriation (country risk), N4904 systemic/failure/regulators, N7131 bullish/traders/volume. L24's are lexical or punning: N6048 "wall" (Wall Street → walls, furniture), N8425 solution/concentrated, N6716 purchasing power parity, N7261 rental/fee.
+
+Two L7 neurons change the stance of the advice:
+- **N4118** (licensed / jurisdiction / regulated) turns the baseline's disclaimer ("I am an AI, not a financial advisor") into a regulatory refusal at +0.8: "I must adhere to strict regulatory guidelines that prohibit me from facilitating transactions with unregulated entities". At −0.7 it is still a disclaimer, followed by nonsense ("the stock ticker symbol $10,000").
+- **N7131** (bullish / traders) drops the disclaimer at +0.8: "Here is a breakdown of what you should do with that capital, based on how professional traders and market analysts…". At −0.7 it refuses on a made-up ground: "my capabilities are strictly limited to creating original stories, poems".
+
+**Reading.** The one-word lens measures the next token, and at these doses that's dominated by answer-word priming and general perturbation (pushes make the model more cautious). Stance effects like N7131's live in the rollouts, where hedging, refusal and framing play out over sentences. The choice lens doesn't see them: N7131 isn't outside the null on any axis. So, for the decision question, sweep A is the instrument and sweep B is not. That's consistent with the mid-layer finding that stance lives in discourse, not single tokens.
+
+**Decision for the full run.** Run sweep A on the remaining 27 layers: about 5–13 min per layer, roughly 4 GPU-hours. Don't run the choice lens over all layers as designed: 20 min/layer for chance-level counts. If it comes back, it needs a stance-sensitive target (P(disclaimer) or P(refusal) at the start of a free answer) rather than one-word answers.
+
+**Untested:**
+- A rollout-level stance score for sweep A (disclaimer present, refusal, explicit recommendation), against controls, rather than word mass.
+- Whether N7131 and N4118 replicate at other doses and prompts.
+- Whether the refusal-leaning shift of random pushes at L7 is general: is it a perturbation-induced caution?
+
+## 2026-10-26 — investing sweep A, all 29 layers: vocabulary yes, stance mostly no
+
+`run_invest.sh` with the choice lens off, on the same 4090. The remaining 27 layers took about 2.5 h. A first attempt died in its first minute: one `neuron_stats.py` pass over 27 layers ran out of memory on 24 GB, so the script now builds stats one layer per pass. In total: 778 candidates over L3–L31, 64 controls per layer, 31,724 rollouts, about $4 of pod time including the pilot. Everything pulled back and checked against the pod (63,537 files, byte totals equal).
+
+**Vocabulary: 188 of 778 candidates (24%) beat every control on word-cluster mass.**
+
+| layers | share above every control |
+|---|---|
+| L3–L4 | 7–19% |
+| L5–L7 | 45–58% |
+| L8–L18 | 0–50%, mostly under 25% (1–16 candidates per layer) |
+| L19–L20 | 39–46% |
+| L21–L28 | 7–30% |
+| L29–L31 | 0% |
+
+The two humps are the depth survey's again. At L29–L31 the "stock"-token neurons don't move the advice's vocabulary past random directions. 184 of the 778 collapse into repetition across their rollouts (mean distinct-4 < 0.8), mostly late.
+
+**Stance: random pushes aren't neutral.** `sweep/stance.py` flags each rollout as refusing ("I cannot provide…" in the opening), disclaiming ("not financial advice", "consult…"), hedging ("depends on") or recommending. Unsteered, none of the four answers refuses, all but the outlook one hedge, and only Bitcoin disclaims. Coherent random-control rollouts refuse 23% of the time and disclaim 22%, mostly as "As an AI, I cannot provide financial advice…". So almost any push tips this model into its cautious mode. That matches the choice lens, where random pushes moved answers away from Buy.
+
+**Against that null, the stance signal is modest.** Each neuron gets two statistics per flag: level (share flagged) and asym (share at the + doses minus share at −0.7; a stance direction should move a flag opposite ways). A neuron counts when a statistic is beyond every coherent control of its layer. The chance rate is the same test on each control against the others (leave-one-out). Observed: 86 hits on 594 coherent neurons against about 54 expected. The clearest excesses are recommend.level+ (7 vs 2.2) and hedge.level− (12 vs 4.5), but reading those rollouts shows neither is a stance:
+- the recommend hits are mostly "I recommend consulting a financial advisor" inside refusals;
+- the hedge− hits still hedge at +0.8 ("depends entirely on…"). They score low because another dose refuses, or because a word swaps in (L24 N6422 "index radiation", L23 N1481 "physical health").
+
+**Retraction from the pilot.** L7 N4118 and N7131 are inside the controls' range on every stance statistic: refuse.asym −0.25 and −0.38, disclaim.asym +0.50 and −0.50, against L7 controls spanning −0.75..+0.62. The pilot entry read them as stance-changing from a few rollouts without the control comparison. Their rollouts do read that way, but random directions produce the same refusals and disclaimer flips.
+
+**Three stance directions survive, by statistic and by reading:**
+- **L10 N1011.** disclaim.asym +1.00 (controls −1.00..+0.62): 0/4 at −0.7, 4/4 at +0.5 and +0.8. + opens with legal boilerplate ("**Disclaimer:** Investing involves risk, including loss of principal. Past performance does not guarantee future results…"); − engages ("That's a great starting point!").
+- **L9 N8869.** refuse.asym +1.00 (controls −0.75..+0.62): + declines ("I cannot provide specific financial advice or recommend a single course of action…"); − engages ("several excellent options depending on your goals…").
+- **L7 N2855.** refuse.asym −1.00 (controls −0.75..+0.62), the opposite orientation: − declines ("I cannot provide specific financial advice, investment recommendations, or execute actions on your behalf"); + engages ("Here's a breakdown of what you should do").
+
+L8 N8025 refuses at both signs (refuse.level 0.67 against controls ≤ 0.58). That's caution as a level, not a direction.
+
+**Caveats.** Four prompts × three doses gives coarse counts (0–4 per dose), and about 54 of the 86 hits are expected by chance. The three above were picked by reading among the hits, so they're candidates until they replicate on new prompts and doses. The regex flags are crude: they miss paraphrased refusals and count "I recommend consulting" as a recommendation.
+
+**Untested:**
+- Replicate N1011, N8869 and N2855 on fresh investing prompts, at doses from ±0.3 to ±0.8, with 256 controls.
+- Whether they're finance-specific or general: do the same pushes add disclaimers or refusals to medical or legal questions?
+- Whether the cautious drift under random pushes holds on non-financial prompts. If it does, "the model gets cautious when disturbed" is the bigger finding.

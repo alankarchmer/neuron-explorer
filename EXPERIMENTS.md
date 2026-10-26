@@ -224,9 +224,45 @@ These are estimates from the depth survey's throughput, not measurements: sweep 
 survey's rollouts, and sweep B has four times the steer lens's contexts (about 7 minutes per layer on a 4090). In
 total, about 1.5–2 hours on four 4090s and around $5–6.
 
-**Status.** Code written and smoke-tested on a Mac. The original lens mode still reproduces the shipped cache (71 of 72
-top tokens, KL within 0.01, on three L22 neurons). The GPU runs haven't happened yet. Results go in
-[research_log.md](research_log.md).
+**Pilot (L7 and L24, one 4090, about $1.50).** The two sweeps disagree, and that disagreement is the finding:
+
+- **The buy/sell lens finds nothing beyond chance.** The share of neurons that move a one-word answer further than
+  99% of random pushes is 0.3–2.2% per layer and question, where chance is 1%. The investing candidates almost never
+  do. The few big movers at L24 just prime the answer word: neurons that raise "buy" push Buy, and neurons that raise
+  "up" or "rising" push Up.
+- **The advice rollouts do show effects.** Half the L7 candidates change what the model writes more than every random
+  push does.
+
+So the one-word lens wasn't run on the other layers, and sweep A was.
+
+**Full run (all 29 layers from L3, about $4 in total).**
+
+*Vocabulary: yes.* 188 of the 778 candidates (24%) change the words of the advice more than every random push in their
+layer does. They peak at L5–L7 (45–58%) and L19–L20 (39–46%), the same two humps as the depth survey. At L29–L31 it's
+zero: the late "stock"-token neurons don't change the advice's vocabulary beyond what random pushes do.
+
+*Stance: mostly no, and random pushes are the reason to be careful.* Unpushed, the model never refuses these questions.
+Pushed in a *random* direction, it refuses about a quarter of the time ("As an AI, I cannot provide financial
+advice…") and adds a disclaimer about as often. Disturbing it in almost any direction makes it more cautious. That's
+the background any "stance neuron" has to beat. Against it, stance effects come out only modestly above chance: 86
+hits where about 54 are expected.
+
+This also corrects the pilot. The two neurons it highlighted, L7 N4118 (regulatory refusal) and L7 N7131 (trader-style
+advice, or a refusal when pushed the other way), read like stance changes. But random directions produce the same
+refusals and disclaimer flips, and these two are inside the random range.
+
+Three neurons pass both the statistics and a reading of their rollouts. Each flips the stance one way when pushed up
+and the other way when pushed down:
+
+| neuron | pushed up | pushed down |
+|---|---|---|
+| L10 N1011 | opens with legal boilerplate: "**Disclaimer:** Investing involves risk… Past performance does not guarantee future results" | engages: "That's a great starting point!" |
+| L9 N8869 | declines: "I cannot provide specific financial advice…" | engages: "several excellent options depending on your goals" |
+| L7 N2855 | engages: "Here's a breakdown of what you should do" | declines: "I cannot provide specific financial advice, investment recommendations…" |
+
+They are candidates, not findings yet. Four questions and three push sizes is a small sample, and they were picked by
+reading among hits that are partly chance. The next step is to test them on new questions, and on medical and legal
+ones, to see whether they're about finance at all. Details are in [research_log.md](research_log.md).
 
 **What this can and can't show.** A neuron that tilts the model toward "Buy" says something about how this model
 represents the decision. It says nothing about whether buying is a good idea. Nothing in this project is financial

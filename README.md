@@ -52,6 +52,8 @@ questions ({invest, funds, bitcoin, outlook} × {−0.7, +0.5, +0.8}).
 | `sweep/steer_lens.py` | `stats/steer_lens_L{l}.npz`: next-token Δlogprob and KL for ±0.8 pushes on every neuron; `--mode choice`: `stats/steer_choice_L{l}.npz`, the shift in Buy/Sell, Shares/Cash and Up/Down answer log-odds, with random controls |
 | `sweep/invest_candidates.py` | `sweep/invest_candidates.json`: the 817 neuron poles whose steer lens raises finance words, per layer |
 | `sweep/run_invest.sh` | `invest_rel` sweep over the candidates of each layer, then the choice lens over those layers |
+| `sweep/stance.py` | `runs/invest_stance.json`: refuse / disclaim / hedge / recommend flags per rollout, neurons beyond every control and the chance rate |
+| `sweep/choice_report.py` | per layer and axis, the poles whose choice-lens shift falls outside the random controls' central 99% |
 | `sweep/depth_report.py` | `runs/depth_report.json`: per-layer share of neurons above controls, coherence, top units |
 | `sweep/shift.py` | word-shift score against controls, all words counted |
 | `sweep/merge_runs.py` | joins sharded runs of one layer |
