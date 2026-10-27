@@ -1,6 +1,7 @@
 # Pre-registration: is financial caution the refusal direction?
 
-**Status: pre-registered, not frozen. Nothing below had been run when this was committed.** The prompt set and this
+**Status: frozen on 2026-10-27 (see "Frozen values" at the end). Nothing below had been run when the first version was
+committed.** The prompt set and this
 plan were committed together ("pre-registration") before any activation was computed. The commit timestamp is the
 record.
 Choices made later on dev data (token set, layer, doses, judge prompt) go into a second commit ("freeze") before any
@@ -148,7 +149,7 @@ own layer is reported as secondary.
 
 These are exploratory because a base model's first token under a chat template is a weaker measurement.
 
-**H7, replication on Phi-4-mini-instruct.** H1, H2 and H3b are repeated with Phi's own l\*, C and KL-matched doses,
+**H7, replication on Phi-4-mini-instruct. Dropped by amendment 4; not run on held-out prompts.** H1, H2 and H3b are repeated with Phi's own l\*, C and KL-matched doses,
 all chosen on dev the same way. These are three tests, corrected separately. The finding generalises only if they
 point the same way as Qwen's.
 
@@ -175,7 +176,8 @@ Each outcome is written up, including the ones that don't hold.
 Everything is forward passes or short greedy rollouts on the Mac (MPS, one model at a time in 16 GB). The largest piece
 is H3/H4: about 70,000 prefill passes (40 held-out prompts × 3 push layers × 64 directions, at 3 original
 doses, again with R ablated, and once per control kind at the KL-matched dose), an estimated 2–3 hours. No GPU rental is planned. If one is needed, a cost
-estimate comes first.
+estimate comes first. (In the event, the Mac ran out of memory during the dose matching, and everything from there on
+ran on a rented RunPod RTX 4090. The code is the same; the chat model's dev benign M agrees to 0.02 between the two.)
 
 ## Amendments
 
@@ -233,3 +235,53 @@ rule, and its push layers are L7, L10 and its own l\*.
   H6 numbers are reported against the chat model's +0.8 pushes on the same prompts.
 - *Everything held-out* runs only after the freeze. The same code is first run on dev prompts (`--split dev`, files
   named `devtest`) to check it works.
+
+**4. H7 is dropped: Phi's caution score can't be defined by the pre-registered rules.** Made on dev data, before the
+freeze and before any held-out prompt was run on any model.
+
+*Why.* Amendment 2's rule gave an empty C. Of Phi's 132 dev answers (52 unpushed, 80 pushed), the refuse regex flags 8,
+and no first token starts at least 5 answers with at least half of them flagged. The nearest is "As": 18 answers, 5
+flagged. Without C there is no M, so Phi's l\* (which needs ablated harmful M) and H1, H2 and H3b can't be run as
+written. Any replacement, such as judge rates in place of M, would be a new rule written after seeing Phi's data, so it
+would not be a replication.
+
+*Finding (dev, descriptive).* Phi-4-mini-instruct barely declines these questions. Unpushed, the regex flags 3 of 20 dev
+targets, 0 of 20 twins and 0 of 12 benign questions; pushed at +0.8, 4 of 45 target answers and 1 of 35 twin answers.
+When Phi is cautious it mostly disclaims and then answers ("As an AI, I don't provide personal financial advice.
+However, …"): 5 of 20 unpushed targets open "As an AI", against 1 of 20 twins. So Phi shows a weak version of the
+behaviour, carried by a disclaimer, not a refusal. Qwen's question has no counterpart on Phi that the pre-registered
+score can measure.
+
+*Consequences.* No Phi held-out run. The 7 Qwen tests and their Benjamini–Hochberg correction are unchanged. H7 is
+reported as not run, with the finding above.
+
+## Frozen values
+
+Fixed on dev data and committed here before any held-out prompt is run. Raw files are in `runs/caution/` (gitignored).
+
+- **Decline tokens C (Qwen3.5-4B and its base model):** token ids 33, 40, 2053, 7732, 12189, 17413, which are "B",
+  "I", "As", "While", "Since" and "Because". They start 47% of the sweep rollouts the refuse regex flags.
+- **l\* = 24** (amendment 1).
+- **Judge:** `claude -p --model sonnet`, no tools, the rubric in `JUDGE` in `sweep/caution.py` at this commit
+  (decline / disclaim / engage), unchanged after the dev checks. The dev checks passed:
+  - judge vs 100 hand labels: κ 0.71 on three labels, 0.81 on caution yes/no (needs ≥ 0.7);
+  - M vs hand-labelled declines: AUROC 0.88 (needs ≥ 0.85; 10 declines, so wide uncertainty);
+  - manipulation check: the judge calls 64% of the 14 confirmatory dev targets cautious and 0% of their twins
+    (needs ≥ 20 points).
+
+  One systematic difference: the judge calls "impossible to predict with certainty…" answers decline, where the hand
+  labels mostly said engage. It is kept as is; κ passed with it.
+- **KL-matched doses** (multiples of the median residual norm leaving the layer; 16 directions per kind on the 12 dev
+  benign prompts, log-log interpolation over doses 0.25–2.7, none clamped):
+
+  | layer | median norm | target KL (candidates at +0.8) | isotropic | random neuron | in-distribution |
+  |---|---|---|---|---|---|
+  | 7 | 7.53 | 3.566 | 1.037 | 0.875 | 1.034 |
+  | 10 | 8.88 | 3.867 | 1.028 | 0.915 | 0.888 |
+  | 24 | 31.07 | 0.545 | 0.814 | 0.839 | 0.369 |
+
+- **Control directions:** 64 per kind and layer, from `numpy.random.default_rng([20261025, layer, kind index])`, kinds
+  in the order isotropic, neuron, in-distribution (`control_dirs` in `sweep/caution.py`).
+- **Code:** `sweep/caution.py` at this commit. The whole held-out pipeline was first run on dev prompts (`--split dev`)
+  for the chat and base models and finished without errors.
+
