@@ -202,3 +202,34 @@ median 0.53. The ablated harmless answers checked at L24 stay on topic and fluen
   openers were "One" / "A".
 
 *Consequences.* H3 and H4 push at L7, L10 and L24. H1's cosine is read at L24.
+
+**2. Phi's decline tokens come from Phi's own dev answers.** Made before any Phi activation was computed.
+
+*Why.* The rule for C uses the investing-sweep rollouts, and Phi has none.
+
+*New rule.* Generate Phi's greedy answers to every dev prompt, unpushed, plus 40 isotropic pushes at +0.8 at each of
+L7 and L10. The push size uses Phi's median residual norm over the dev benign prompts' tokens. C is then every first
+token that starts at least 5 of these answers, with at least half of them flagged by the refuse regex. The count
+threshold drops from 20 to 5 because there are about 130 answers instead of 31,724. Phi's l\* follows amendment 1's
+rule, and its push layers are L7, L10 and its own l\*.
+
+**3. Details the plan left open, fixed in code before the freeze** (`sweep/caution.py`, `heldout`, `base`, `analyze`):
+
+- *Prompts for H2–H5:* the 14 held-out confirmatory targets, their 14 twins and the 12 held-out benign questions
+  (40 prompts). H1 uses all 20 held-out pairs; the cosine test uses the confirmatory ones.
+- *H2:* greedy answers (≤ 256 tokens) to every held-out prompt, with and without ablation, go to the judge. The
+  caution rate is read on confirmatory targets. The p-value is the larger of two one-sided sign-flip tests over
+  prompts, one on the caution rate and one on the target–twin gap in M.
+- *H3a:* Spearman correlation over 576 direction-conditions (3 push layers × 3 doses × 64 directions), each averaged
+  over the 40 prompts, with a 10,000-permutation p-value.
+- *H3b:* the M part pools all three doses and push layers. The caution-rate part uses answers for the first 8
+  isotropic directions per push layer at +0.8, on the confirmatory targets and twins, with and without ablation. The
+  p-value is a sign-flip test over prompts on the added M.
+- *H4:* caution is measured with M, pooled over push layers. Each kind uses its own seeded 64 directions at its
+  KL-matched dose, with sign +.
+- *H5:* the candidates and controls push at +0.8 on the 40 prompts. The residual change at L24 is averaged over
+  prompts. p = (1 + controls at least as far in the predicted direction) / 129.
+- *H6:* the base model's pushes use its own median residual norm. Its R comes from the same 128 + 128 prompts. Both
+  H6 numbers are reported against the chat model's +0.8 pushes on the same prompts.
+- *Everything held-out* runs only after the freeze. The same code is first run on dev prompts (`--split dev`, files
+  named `devtest`) to check it works.
