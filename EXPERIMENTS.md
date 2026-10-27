@@ -268,7 +268,7 @@ ones, to see whether they're about finance at all. Details are in [research_log.
 represents the decision. It says nothing about whether buying is a good idea. Nothing in this project is financial
 advice, and a 4B model's answers to these questions aren't either.
 
-## Next experiment (pre-registered): is financial caution the refusal direction?
+## Pre-registered experiment: is financial caution the refusal direction?
 
 The most interesting result above isn't a neuron. It's that random pushes make the model cautious. The next experiment
 asks why:
@@ -281,6 +281,13 @@ It starts from contrasts rather than vocabulary: 40 pairs of questions that diff
 stock?" / "Should I buy a Tesla car?"), split into dev and held-out halves. The hypotheses, the thresholds that would
 falsify them, and the analysis plan are fixed in [PREREGISTRATION.md](PREREGISTRATION.md) before anything runs. It is
 kept as its own file so later edits here can't blur what was decided in advance.
+
+**Result (2026-10-27): no.** Ablating the refusal direction leaves Qwen's financial caution in place (H2 not
+supported), and the finance contrast's cosine with it, 0.36, isn't beyond chance at the pre-registered p < .01 (H1).
+What does hold: random pushes' caution tracks how far they move along the refusal direction (ρ 0.64), and ablating it
+removes about a third of that caution (H3, partial). At matched KL, isotropic noise is as cautionary as random neurons
+(H4: neither pattern). Of the three candidates, only L9 N8869 writes along the refusal direction (H5). Phi couldn't be
+tested: it barely declines (amendment 4). Full table and reading in [research_log.md](research_log.md).
 
 ## Reproducing
 

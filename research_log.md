@@ -373,3 +373,34 @@ L8 N8025 refuses at both signs (refuse.level 0.67 against controls ≤ 0.58). Th
 - Replicate N1011, N8869 and N2855 on fresh investing prompts, at doses from ±0.3 to ±0.8, with 256 controls.
 - Whether they're finance-specific or general: do the same pushes add disclaimers or refusals to medical or legal questions?
 - Whether the cautious drift under random pushes holds on non-financial prompts. If it does, "the model gets cautious when disturbed" is the bigger finding.
+
+## 2026-10-27 — pre-registered test: financial caution is not the refusal direction
+
+Run as pre-registered in [PREREGISTRATION.md](PREREGISTRATION.md), frozen in `357b417` before any held-out prompt was run. Dose matching and the held-out runs went on a RunPod 4090 after the Mac ran out of memory (about $1.50 in all). The judge (`claude -p --model sonnet`) labelled all 1,448 held-out answers. Raw outputs: `runs/caution/heldout_*.pt`, `answers_heldout_*.jsonl`, `judge_answers_heldout_*.jsonl`, `report_heldout.json`. l\* = 24 throughout.
+
+| test | result | pre-registered verdict |
+|---|---|---|
+| H1: F_held aligns with R | cos 0.36 (CI 0.26–0.42); sign-flip null 99th pct 0.39, p = .023 | not supported (needs p < .01) |
+| H2: ablating R removes financial caution | judge caution on 14 confirmatory targets 36% → 64%; target–twin M gap 3.85 → 3.11 (−19%, CI −27%..+42%); p = .98 | not supported |
+| H3a: push caution tracks movement along R | Spearman ρ 0.64 over 576 direction-conditions, p < .001 | supported |
+| H3b: ablating R shrinks push caution | added M 1.75 → 1.20 (−31%, CI 16–46%); added caution rate 11.3 → 8.0 points (−29%); p < .001 | partial |
+| H4: off-manifold or general | at KL-matched doses isotropic adds 1.03× the M of random neurons, 1.63× of in-distribution directions | neither |
+| H5 L9 N8869 | cos with R at L24 0.32, above all 128 controls (max 0.26), p = .008 | refusal component |
+| H5 L10 N1011 | 0.16 (controls max 0.26), p = .15 | not supported |
+| H5 L7 N2855 | +0.08, against the predicted − sign (signed controls max 0.10), p = .39 | not supported |
+| H6: base model (exploratory) | base R vs chat R cos 0.82; the same pushes add M 1.01 in base vs 2.43 in chat | — |
+| H7: Phi | not run (amendment 4: Phi barely declines, so its caution score is undefined) | — |
+
+Benjamini–Hochberg at q = .05 over the 7 Qwen tests keeps H1, H3a, H3b and H5 N8869. H1 passes that correction but not its own pre-registered p < .01, so it stays "not supported".
+
+**Reading.**
+- **Financial caution is not the refusal direction.** Ablating R everywhere leaves Qwen's caution on financial questions in place. The answers barely change. "Should I buy Apple shares or Microsoft shares?" engages before and declines after ("As an AI, I cannot provide personalized financial advice…"); "Is Nvidia stock going to rise this quarter?" declines before and disclaims after. The judge's rate rising from 5/14 to 9/14 is mostly labels moving between borderline categories on near-identical text, not more caution. The prediction was that it would fall by half.
+- **The two are related, not the same.** The finance contrast has cosine 0.36 with R, well above zero but inside what 14 pairs give under the sign-flip null.
+- **Random pushes do set off refusal.** How much a random push raises the caution score tracks how far it moves the residual along R (ρ 0.64), and ablating R removes about a third of the effect. So "the model gets cautious when disturbed" runs partly through the refusal direction, and two thirds of it doesn't.
+- **The investing neurons aren't special pushes.** At matched KL, isotropic noise adds as much caution as random neurons' output weights; in-distribution directions add less (1.6×). Neither pre-registered pattern (off-manifold > 2×, or all within 1.5×) fits.
+- **One candidate writes along R.** L9 N8869, the one whose + push declined in the sweep, moves L24 along R further than all 128 controls. N1011, the disclaimer neuron, and N2855 don't.
+- **Chat training amplifies it.** The base model has nearly the same refusal direction (cos 0.82), but the same pushes add less than half the caution there.
+
+**Caveats.** 14 confirmatory pairs is small: H1's null is wide, and H2's caution rates move in steps of 7 points. The judge's borderline calls (κ 0.71 with hand labels on dev) drive H2's rate. One model: the Phi replication couldn't be run.
+
+**Untested:** what direction does carry financial caution if R doesn't (e.g. ablate F_dev and measure the held-out rate); whether the two thirds of push-caution outside R is one other direction; the H3 analysis on medical and legal questions.
